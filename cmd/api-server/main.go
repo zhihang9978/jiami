@@ -6,12 +6,18 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/feiji/feiji-backend/internal/admin"
 	"github.com/feiji/feiji-backend/internal/api"
 	"github.com/feiji/feiji-backend/internal/auth"
+	"github.com/feiji/feiji-backend/internal/calls"
+	"github.com/feiji/feiji-backend/internal/channels"
+	"github.com/feiji/feiji-backend/internal/chats"
 	"github.com/feiji/feiji-backend/internal/config"
 	"github.com/feiji/feiji-backend/internal/contacts"
 	"github.com/feiji/feiji-backend/internal/files"
 	"github.com/feiji/feiji-backend/internal/messages"
+	"github.com/feiji/feiji-backend/internal/push"
+	"github.com/feiji/feiji-backend/internal/search"
 	"github.com/feiji/feiji-backend/internal/store"
 	"github.com/feiji/feiji-backend/internal/updates"
 	"github.com/feiji/feiji-backend/internal/users"
@@ -49,6 +55,12 @@ func main() {
 	usersRepo := users.NewRepository(mysqlStore.DB())
 	filesRepo := files.NewRepository(mysqlStore.DB())
 	updatesRepo := updates.NewRepository(mysqlStore.DB())
+	chatsRepo := chats.NewRepository(mysqlStore.DB())
+	channelsRepo := channels.NewRepository(mysqlStore.DB())
+	searchRepo := search.NewRepository(mysqlStore.DB())
+	pushRepo := push.NewRepository(mysqlStore.DB())
+	adminRepo := admin.NewRepository(mysqlStore.DB())
+	callsRepo := calls.NewRepository(mysqlStore.DB())
 
 	// Initialize services
 	authService := auth.NewService(authRepo, redisStore)
@@ -57,6 +69,12 @@ func main() {
 	usersService := users.NewService(usersRepo)
 	filesService := files.NewService(filesRepo, cfg.UploadPath, cfg.BaseURL)
 	updatesService := updates.NewService(updatesRepo)
+	chatsService := chats.NewService(chatsRepo)
+	channelsService := channels.NewService(channelsRepo)
+	searchService := search.NewService(searchRepo)
+	pushService := push.NewService(pushRepo)
+	adminService := admin.NewService(adminRepo)
+	callsService := calls.NewService(callsRepo)
 
 	// Initialize WebSocket hub
 	hub := ws.NewHub()
@@ -70,6 +88,12 @@ func main() {
 		Users:    api.NewUsersHandler(usersService),
 		Files:    api.NewFilesHandler(filesService),
 		Updates:  api.NewUpdatesHandler(updatesService),
+		Chats:    api.NewChatsHandler(chatsService),
+		Channels: api.NewChannelsHandler(channelsService),
+		Search:   api.NewSearchHandler(searchService),
+		Push:     api.NewPushHandler(pushService),
+		Admin:    api.NewAdminHandler(adminService),
+		Calls:    api.NewCallsHandler(callsService),
 		WS:       ws.NewHandler(hub, authService),
 	}
 

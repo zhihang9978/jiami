@@ -12,6 +12,12 @@ type Handlers struct {
 	Users    *UsersHandler
 	Files    *FilesHandler
 	Updates  *UpdatesHandler
+	Chats    *ChatsHandler
+	Channels *ChannelsHandler
+	Search   *SearchHandler
+	Push     *PushHandler
+	Admin    *AdminHandler
+	Calls    *CallsHandler
 	WS       *ws.Handler
 }
 
@@ -108,6 +114,110 @@ func SetupRouter(handlers *Handlers, authService *auth.Service) *gin.Engine {
 			updatesGroup.GET("/getState", handlers.Updates.GetState)
 			updatesGroup.POST("/getDifference", handlers.Updates.GetDifference)
 			updatesGroup.POST("/getChannelDifference", handlers.Updates.GetChannelDifference)
+		}
+
+		// Chats (Groups)
+		if handlers.Chats != nil {
+			chatsGroup := protected.Group("/messages")
+			{
+				chatsGroup.POST("/createChat", handlers.Chats.CreateChat)
+				chatsGroup.POST("/getFullChat", handlers.Chats.GetFullChat)
+				chatsGroup.POST("/editChatTitle", handlers.Chats.EditChatTitle)
+				chatsGroup.POST("/editChatPhoto", handlers.Chats.EditChatPhoto)
+				chatsGroup.POST("/addChatUser", handlers.Chats.AddChatUser)
+				chatsGroup.POST("/deleteChatUser", handlers.Chats.DeleteChatUser)
+				chatsGroup.POST("/leaveChat", handlers.Chats.LeaveChat)
+				chatsGroup.POST("/editChatAdmin", handlers.Chats.EditChatAdmin)
+				chatsGroup.POST("/getCommonChats", handlers.Chats.GetCommonChats)
+			}
+		}
+
+		// Channels
+		if handlers.Channels != nil {
+			channelsGroup := protected.Group("/channels")
+			{
+				channelsGroup.POST("/createChannel", handlers.Channels.CreateChannel)
+				channelsGroup.POST("/getFullChannel", handlers.Channels.GetFullChannel)
+				channelsGroup.POST("/editTitle", handlers.Channels.EditTitle)
+				channelsGroup.POST("/editAbout", handlers.Channels.EditAbout)
+				channelsGroup.POST("/updateUsername", handlers.Channels.UpdateUsername)
+				channelsGroup.POST("/joinChannel", handlers.Channels.JoinChannel)
+				channelsGroup.POST("/leaveChannel", handlers.Channels.LeaveChannel)
+				channelsGroup.POST("/inviteToChannel", handlers.Channels.InviteToChannel)
+				channelsGroup.POST("/kickFromChannel", handlers.Channels.KickFromChannel)
+				channelsGroup.POST("/getParticipants", handlers.Channels.GetParticipants)
+				channelsGroup.POST("/getChannels", handlers.Channels.GetChannels)
+				channelsGroup.GET("/getChannels", handlers.Channels.GetChannels)
+				channelsGroup.POST("/checkUsername", handlers.Channels.CheckUsername)
+			}
+		}
+
+		// Search
+		if handlers.Search != nil {
+			searchGroup := protected.Group("/messages")
+			{
+				searchGroup.POST("/searchGlobal", handlers.Search.SearchGlobal)
+				searchGroup.POST("/search", handlers.Search.SearchMessages)
+				searchGroup.POST("/searchHashtag", handlers.Search.SearchHashtag)
+			}
+			contactsSearchGroup := protected.Group("/contacts")
+			{
+				contactsSearchGroup.POST("/getRecentSearch", handlers.Search.GetRecentSearch)
+				contactsSearchGroup.POST("/clearRecentSearch", handlers.Search.ClearRecentSearch)
+				contactsSearchGroup.POST("/searchUsers", handlers.Search.SearchUsers)
+				contactsSearchGroup.POST("/searchChannels", handlers.Search.SearchChannels)
+			}
+		}
+
+		// Push Notifications
+		if handlers.Push != nil {
+			accountPushGroup := protected.Group("/account")
+			{
+				accountPushGroup.POST("/registerDevice", handlers.Push.RegisterDevice)
+				accountPushGroup.POST("/unregisterDevice", handlers.Push.UnregisterDevice)
+				accountPushGroup.POST("/getNotifySettings", handlers.Push.GetNotifySettings)
+				accountPushGroup.POST("/updateNotifySettings", handlers.Push.UpdateNotifySettings)
+				accountPushGroup.POST("/resetNotifySettings", handlers.Push.ResetNotifySettings)
+				accountPushGroup.POST("/getAllNotifySettings", handlers.Push.GetAllNotifySettings)
+			}
+		}
+
+		// Phone Calls (VoIP)
+		if handlers.Calls != nil {
+			phoneGroup := protected.Group("/phone")
+			{
+				phoneGroup.POST("/requestCall", handlers.Calls.RequestCall)
+				phoneGroup.POST("/acceptCall", handlers.Calls.AcceptCall)
+				phoneGroup.POST("/discardCall", handlers.Calls.DiscardCall)
+				phoneGroup.POST("/confirmCall", handlers.Calls.ConfirmCall)
+				phoneGroup.POST("/receivedCall", handlers.Calls.ReceivedCall)
+				phoneGroup.POST("/setCallRating", handlers.Calls.SetCallRating)
+				phoneGroup.POST("/saveCallDebug", handlers.Calls.SaveCallDebug)
+				phoneGroup.POST("/getCallConfig", handlers.Calls.GetCallConfig)
+				phoneGroup.GET("/getCallConfig", handlers.Calls.GetCallConfig)
+			}
+		}
+	}
+
+	// Admin routes (separate authentication)
+	if handlers.Admin != nil {
+		adminGroup := r.Group("/admin")
+		{
+			adminGroup.GET("/stats", handlers.Admin.GetStats)
+			adminGroup.GET("/users", handlers.Admin.GetUsers)
+			adminGroup.GET("/users/:id", handlers.Admin.GetUser)
+			adminGroup.POST("/users", handlers.Admin.CreateUser)
+			adminGroup.PUT("/users/:id", handlers.Admin.UpdateUser)
+			adminGroup.DELETE("/users/:id", handlers.Admin.DeleteUser)
+			adminGroup.POST("/users/:id/ban", handlers.Admin.BanUser)
+			adminGroup.POST("/users/:id/unban", handlers.Admin.UnbanUser)
+			adminGroup.GET("/messages", handlers.Admin.GetMessages)
+			adminGroup.DELETE("/messages/:id", handlers.Admin.DeleteMessage)
+			adminGroup.GET("/chats", handlers.Admin.GetChats)
+			adminGroup.GET("/channels", handlers.Admin.GetChannels)
+			adminGroup.GET("/users/:id/sessions", handlers.Admin.GetSessions)
+			adminGroup.DELETE("/sessions/:id", handlers.Admin.TerminateSession)
+			adminGroup.DELETE("/users/:id/sessions", handlers.Admin.TerminateAllSessions)
 		}
 	}
 
