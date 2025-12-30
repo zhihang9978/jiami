@@ -109,6 +109,10 @@ func main() {
 	// Setup router
 	router := api.SetupRouter(handlers, authService)
 
+	// Setup admin panel routes
+	admin.SetupAdminRouter(router, mysqlStore.DB())
+	log.Println("Admin panel routes initialized")
+
 	// Start server
 	log.Printf("Starting API server on port %s", cfg.HTTPPort)
 
