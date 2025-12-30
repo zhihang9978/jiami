@@ -9,6 +9,7 @@ import (
 	"github.com/feiji/feiji-backend/internal/admin"
 	"github.com/feiji/feiji-backend/internal/api"
 	"github.com/feiji/feiji-backend/internal/auth"
+	"github.com/feiji/feiji-backend/internal/broadcasts"
 	"github.com/feiji/feiji-backend/internal/calls"
 	"github.com/feiji/feiji-backend/internal/channels"
 	"github.com/feiji/feiji-backend/internal/chats"
@@ -18,6 +19,7 @@ import (
 	"github.com/feiji/feiji-backend/internal/messages"
 	"github.com/feiji/feiji-backend/internal/push"
 	"github.com/feiji/feiji-backend/internal/search"
+	"github.com/feiji/feiji-backend/internal/secretchats"
 	"github.com/feiji/feiji-backend/internal/store"
 	"github.com/feiji/feiji-backend/internal/updates"
 	"github.com/feiji/feiji-backend/internal/users"
@@ -61,6 +63,8 @@ func main() {
 	pushRepo := push.NewRepository(mysqlStore.DB())
 	adminRepo := admin.NewRepository(mysqlStore.DB())
 	callsRepo := calls.NewRepository(mysqlStore.DB())
+	secretChatsRepo := secretchats.NewRepository(mysqlStore.DB())
+	broadcastsRepo := broadcasts.NewRepository(mysqlStore.DB())
 
 	// Initialize services
 	authService := auth.NewService(authRepo, redisStore)
@@ -75,6 +79,8 @@ func main() {
 	pushService := push.NewService(pushRepo)
 	adminService := admin.NewService(adminRepo)
 	callsService := calls.NewService(callsRepo)
+	secretChatsService := secretchats.NewService(secretChatsRepo)
+	broadcastsService := broadcasts.NewService(broadcastsRepo)
 
 	// Initialize WebSocket hub
 	hub := ws.NewHub()
@@ -83,18 +89,21 @@ func main() {
 
 	// Initialize handlers
 	handlers := &api.Handlers{
-		Main:     api.NewHandler(authService, messagesService),
-		Contacts: api.NewContactsHandler(contactsService),
-		Users:    api.NewUsersHandler(usersService),
-		Files:    api.NewFilesHandler(filesService),
-		Updates:  api.NewUpdatesHandler(updatesService),
-		Chats:    api.NewChatsHandler(chatsService),
-		Channels: api.NewChannelsHandler(channelsService),
-		Search:   api.NewSearchHandler(searchService),
-		Push:     api.NewPushHandler(pushService),
-		Admin:    api.NewAdminHandler(adminService),
-		Calls:    api.NewCallsHandler(callsService),
-		WS:       ws.NewHandler(hub, authService),
+		Main:        api.NewHandler(authService, messagesService),
+		Contacts:    api.NewContactsHandler(contactsService),
+		Users:       api.NewUsersHandler(usersService),
+		Files:       api.NewFilesHandler(filesService),
+		Updates:     api.NewUpdatesHandler(updatesService),
+		Chats:       api.NewChatsHandler(chatsService),
+		Channels:    api.NewChannelsHandler(channelsService),
+		Search:      api.NewSearchHandler(searchService),
+		Push:        api.NewPushHandler(pushService),
+		Admin:       api.NewAdminHandler(adminService),
+		Calls:       api.NewCallsHandler(callsService),
+		Media:       api.NewMediaHandler(cfg.UploadPath, cfg.BaseURL),
+		SecretChats: api.NewSecretChatsHandler(secretChatsService),
+		Broadcasts:  api.NewBroadcastsHandler(broadcastsService),
+		WS:          ws.NewHandler(hub, authService),
 	}
 
 	// Setup router

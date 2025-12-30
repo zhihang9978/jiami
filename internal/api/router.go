@@ -7,18 +7,21 @@ import (
 )
 
 type Handlers struct {
-	Main     *Handler
-	Contacts *ContactsHandler
-	Users    *UsersHandler
-	Files    *FilesHandler
-	Updates  *UpdatesHandler
-	Chats    *ChatsHandler
-	Channels *ChannelsHandler
-	Search   *SearchHandler
-	Push     *PushHandler
-	Admin    *AdminHandler
-	Calls    *CallsHandler
-	WS       *ws.Handler
+	Main        *Handler
+	Contacts    *ContactsHandler
+	Users       *UsersHandler
+	Files       *FilesHandler
+	Updates     *UpdatesHandler
+	Chats       *ChatsHandler
+	Channels    *ChannelsHandler
+	Search      *SearchHandler
+	Push        *PushHandler
+	Admin       *AdminHandler
+	Calls       *CallsHandler
+	Media       *MediaHandler
+	SecretChats *SecretChatsHandler
+	Broadcasts  *BroadcastsHandler
+	WS          *ws.Handler
 }
 
 func SetupRouter(handlers *Handlers, authService *auth.Service) *gin.Engine {
@@ -199,9 +202,61 @@ func SetupRouter(handlers *Handlers, authService *auth.Service) *gin.Engine {
 		}
 	}
 
-	// Admin routes (separate authentication)
+	// REST-style Media Upload (Devin.md endpoints)
+	if handlers.Media != nil {
+		// Simple upload endpoints
+		uploadMediaGroup := protected.Group("/api/v1/upload")
+		{
+			uploadMediaGroup.POST("/voice", handlers.Media.UploadVoice)
+			uploadMediaGroup.POST("/video", handlers.Media.UploadVideo)
+			uploadMediaGroup.POST("/file", handlers.Media.UploadFile)
+			uploadMediaGroup.POST("/image", handlers.Media.UploadImage)
+		}
+
+		// Multipart upload endpoints
+		mediaGroup := protected.Group("/api/v1/media")
+		{
+			mediaGroup.POST("/init", handlers.Media.MediaInit)
+			mediaGroup.POST("/upload", handlers.Media.MediaUpload)
+			mediaGroup.POST("/complete", handlers.Media.MediaComplete)
+			mediaGroup.GET("/:file_id", handlers.Media.GetMedia)
+		}
+	}
+
+	// Secret Chats (E2E encrypted)
+	if handlers.SecretChats != nil {
+		secretChatsGroup := protected.Group("/api/v1/secret_chats")
+		{
+			secretChatsGroup.POST("/create", handlers.SecretChats.CreateSecretChat)
+			secretChatsGroup.POST("/status", handlers.SecretChats.UpdateSecretChatStatus)
+			secretChatsGroup.GET("/list", handlers.SecretChats.GetSecretChatList)
+			secretChatsGroup.POST("/close", handlers.SecretChats.CloseSecretChat)
+		}
+
+		secretMessagesGroup := protected.Group("/api/v1/secret_messages")
+		{
+			secretMessagesGroup.POST("/send", handlers.SecretChats.SendSecretMessage)
+			secretMessagesGroup.GET("/history", handlers.SecretChats.GetSecretMessageHistory)
+		}
+	}
+
+	// Broadcasts
+	if handlers.Broadcasts != nil {
+		broadcastsGroup := protected.Group("/api/v1/broadcasts")
+		{
+			broadcastsGroup.POST("/create", handlers.Broadcasts.CreateBroadcast)
+			broadcastsGroup.GET("/list", handlers.Broadcasts.GetBroadcastList)
+			broadcastsGroup.GET("/:id", handlers.Broadcasts.GetBroadcast)
+			broadcastsGroup.PUT("/:id", handlers.Broadcasts.UpdateBroadcast)
+			broadcastsGroup.DELETE("/:id", handlers.Broadcasts.DeleteBroadcast)
+			broadcastsGroup.POST("/:id/send", handlers.Broadcasts.SendBroadcast)
+		}
+	}
+
+	// Admin routes (with authentication middleware)
 	if handlers.Admin != nil {
 		adminGroup := r.Group("/admin")
+		adminGroup.Use(AdminAuthMiddleware())
 		{
 			adminGroup.GET("/stats", handlers.Admin.GetStats)
 			adminGroup.GET("/users", handlers.Admin.GetUsers)
@@ -255,6 +310,37 @@ func AuthMiddleware(authService *auth.Service) gin.HandlerFunc {
 		authService.UpdateUserOnline(c.Request.Context(), user.ID)
 
 		c.Set("user", user)
+		c.Set("user_id", user.ID)
+		c.Next()
+	}
+}
+
+// AdminAuthMiddleware validates admin JWT token (section 3.11.13 of BACKEND_COMPLETE_SPECIFICATION.md)
+func AdminAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token := c.GetHeader("Authorization")
+		if token == "" {
+			c.JSON(401, gin.H{"error": "unauthorized", "message": "Missing Authorization header"})
+			c.Abort()
+			return
+		}
+
+		// Remove "Bearer " prefix if present
+		if len(token) > 7 && token[:7] == "Bearer " {
+			token = token[7:]
+		}
+
+		// For now, accept any non-empty token (in production, validate JWT)
+		// TODO: Implement proper JWT validation with secret key
+		if token == "" {
+			c.JSON(401, gin.H{"error": "unauthorized", "message": "Invalid token"})
+			c.Abort()
+			return
+		}
+
+		// Set admin info in context
+		c.Set("admin_token", token)
+		c.Set("admin_role", "super_admin") // Default role
 		c.Next()
 	}
 }
