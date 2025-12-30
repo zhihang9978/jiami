@@ -10,9 +10,12 @@ import (
 	"github.com/feiji/feiji-backend/internal/auth"
 	"github.com/feiji/feiji-backend/internal/config"
 	"github.com/feiji/feiji-backend/internal/contacts"
+	"github.com/feiji/feiji-backend/internal/files"
 	"github.com/feiji/feiji-backend/internal/messages"
 	"github.com/feiji/feiji-backend/internal/store"
+	"github.com/feiji/feiji-backend/internal/updates"
 	"github.com/feiji/feiji-backend/internal/users"
+	"github.com/feiji/feiji-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
 
@@ -44,18 +47,30 @@ func main() {
 	messagesRepo := messages.NewRepository(mysqlStore.DB())
 	contactsRepo := contacts.NewRepository(mysqlStore.DB())
 	usersRepo := users.NewRepository(mysqlStore.DB())
+	filesRepo := files.NewRepository(mysqlStore.DB())
+	updatesRepo := updates.NewRepository(mysqlStore.DB())
 
 	// Initialize services
 	authService := auth.NewService(authRepo, redisStore)
 	messagesService := messages.NewService(messagesRepo, redisStore)
 	contactsService := contacts.NewService(contactsRepo)
 	usersService := users.NewService(usersRepo)
+	filesService := files.NewService(filesRepo, cfg.UploadPath, cfg.BaseURL)
+	updatesService := updates.NewService(updatesRepo)
+
+	// Initialize WebSocket hub
+	hub := ws.NewHub()
+	go hub.Run()
+	log.Println("WebSocket hub started")
 
 	// Initialize handlers
 	handlers := &api.Handlers{
 		Main:     api.NewHandler(authService, messagesService),
 		Contacts: api.NewContactsHandler(contactsService),
 		Users:    api.NewUsersHandler(usersService),
+		Files:    api.NewFilesHandler(filesService),
+		Updates:  api.NewUpdatesHandler(updatesService),
+		WS:       ws.NewHandler(hub, authService),
 	}
 
 	// Setup router

@@ -2,6 +2,7 @@ package api
 
 import (
 	"github.com/feiji/feiji-backend/internal/auth"
+	"github.com/feiji/feiji-backend/internal/ws"
 	"github.com/gin-gonic/gin"
 )
 
@@ -9,6 +10,9 @@ type Handlers struct {
 	Main     *Handler
 	Contacts *ContactsHandler
 	Users    *UsersHandler
+	Files    *FilesHandler
+	Updates  *UpdatesHandler
+	WS       *ws.Handler
 }
 
 func SetupRouter(handlers *Handlers, authService *auth.Service) *gin.Engine {
@@ -86,6 +90,30 @@ func SetupRouter(handlers *Handlers, authService *auth.Service) *gin.Engine {
 			accountGroup.POST("/checkUsername", handlers.Users.CheckUsername)
 			accountGroup.POST("/updateStatus", handlers.Users.UpdateStatus)
 		}
+
+		// Upload (Files)
+		uploadGroup := protected.Group("/upload")
+		{
+			uploadGroup.POST("/saveFilePart", handlers.Files.SaveFilePart)
+			uploadGroup.POST("/saveBigFilePart", handlers.Files.SaveBigFilePart)
+			uploadGroup.POST("/getFile", handlers.Files.GetFile)
+			uploadGroup.POST("/completeUpload", handlers.Files.CompleteUpload)
+			uploadGroup.GET("/getNextFileID", handlers.Files.GetNextFileID)
+		}
+
+		// Updates
+		updatesGroup := protected.Group("/updates")
+		{
+			updatesGroup.POST("/getState", handlers.Updates.GetState)
+			updatesGroup.GET("/getState", handlers.Updates.GetState)
+			updatesGroup.POST("/getDifference", handlers.Updates.GetDifference)
+			updatesGroup.POST("/getChannelDifference", handlers.Updates.GetChannelDifference)
+		}
+	}
+
+	// WebSocket endpoint
+	if handlers.WS != nil {
+		r.GET("/ws", handlers.WS.HandleWebSocket)
 	}
 
 	return r
