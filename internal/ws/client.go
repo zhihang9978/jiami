@@ -1,12 +1,26 @@
 package ws
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
 
 	"github.com/gorilla/websocket"
 )
+
+// CallService interface for call operations
+type CallService interface {
+	GetCall(ctx context.Context, callID int64) (*CallInfo, error)
+}
+
+// CallInfo represents basic call information
+type CallInfo struct {
+	ID       int64
+	CallerID int64
+	CalleeID int64
+	State    string
+}
 
 const (
 	// Time allowed to write a message to the peer
@@ -132,8 +146,80 @@ func (c *Client) handleMessage(message []byte) {
 	case "ack":
 		// Client acknowledged receiving an update
 		// Could be used for delivery confirmation
+	case "signaling":
+		// Handle VoIP signaling data forwarding
+		c.handleSignaling(msg)
 	default:
 		log.Printf("Unknown WebSocket message type: %s", msgType)
+	}
+}
+
+// handleSignaling processes VoIP signaling messages and forwards them to the peer
+func (c *Client) handleSignaling(msg map[string]interface{}) {
+	// Extract call_id from message
+	callIDFloat, ok := msg["call_id"].(float64)
+	if !ok {
+		log.Printf("Signaling message missing call_id")
+		c.Send(map[string]interface{}{
+			"type":  "error",
+			"error": "missing call_id",
+		})
+		return
+	}
+	callID := int64(callIDFloat)
+
+	// Extract signaling data
+	data, ok := msg["data"].(string)
+	if !ok {
+		log.Printf("Signaling message missing data")
+		c.Send(map[string]interface{}{
+			"type":  "error",
+			"error": "missing data",
+		})
+		return
+	}
+
+	// Get call info from hub's call service
+	callInfo := c.hub.GetCallInfo(callID)
+	if callInfo == nil {
+		log.Printf("Call not found: %d", callID)
+		c.Send(map[string]interface{}{
+			"type":  "error",
+			"error": "call not found",
+		})
+		return
+	}
+
+	// Verify sender is a participant in the call
+	if callInfo.CallerID != c.userID && callInfo.CalleeID != c.userID {
+		log.Printf("User %d is not a participant in call %d", c.userID, callID)
+		c.Send(map[string]interface{}{
+			"type":  "error",
+			"error": "not authorized",
+		})
+		return
+	}
+
+	// Determine the peer (the other participant)
+	var peerID int64
+	if callInfo.CallerID == c.userID {
+		peerID = callInfo.CalleeID
+	} else {
+		peerID = callInfo.CallerID
+	}
+
+	// Forward signaling data to peer
+	forwardMsg := map[string]interface{}{
+		"type":         "signaling",
+		"call_id":      callID,
+		"from_user_id": c.userID,
+		"data":         data,
+	}
+
+	if err := c.hub.SendToUser(peerID, forwardMsg); err != nil {
+		log.Printf("Failed to forward signaling to user %d: %v", peerID, err)
+	} else {
+		log.Printf("Forwarded signaling from user %d to user %d for call %d", c.userID, peerID, callID)
 	}
 }
 

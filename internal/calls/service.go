@@ -253,6 +253,9 @@ func (c *Call) ToTL() map[string]interface{} {
 		"video":           c.IsVideo,
 		"duration":        c.Duration,
 		"key_fingerprint": c.KeyFingerprint,
+		"e2ee_enabled":    true,
+		"e2ee_version":    "1.0",
+		"connections":     c.getConnections(),
 	}
 
 	switch c.State {
@@ -271,6 +274,36 @@ func (c *Call) ToTL() map[string]interface{} {
 	}
 
 	return result
+}
+
+// getConnections returns ICE server connections for the call
+func (c *Call) getConnections() []map[string]interface{} {
+	return []map[string]interface{}{
+		{
+			"_":        "phoneConnection",
+			"id":       1,
+			"ip":       "43.229.114.106",
+			"ipv6":     "",
+			"port":     3478,
+			"peer_tag": "",
+			"turn":     true,
+			"stun":     true,
+			"username": "feiji",
+			"password": "feiji-turn-secret-2024",
+		},
+		{
+			"_":        "phoneConnection",
+			"id":       2,
+			"ip":       "stun.l.google.com",
+			"ipv6":     "",
+			"port":     19302,
+			"peer_tag": "",
+			"turn":     false,
+			"stun":     true,
+			"username": "",
+			"password": "",
+		},
+	}
 }
 
 func (c *Call) getDiscardReason() map[string]interface{} {

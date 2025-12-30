@@ -1,8 +1,12 @@
 package ws
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
+	"log"
 	"sync"
+	"time"
 )
 
 // Hub maintains the set of active clients and broadcasts messages to clients
@@ -21,6 +25,9 @@ type Hub struct {
 
 	// Mutex for thread-safe operations
 	mu sync.RWMutex
+
+	// Database connection for call lookups
+	db *sql.DB
 }
 
 // UserMessage represents a message to be sent to a specific user
@@ -37,6 +44,48 @@ func NewHub() *Hub {
 		unregister: make(chan *Client),
 		broadcast:  make(chan *UserMessage, 256),
 	}
+}
+
+// NewHubWithDB creates a new Hub with database connection for call lookups
+func NewHubWithDB(db *sql.DB) *Hub {
+	return &Hub{
+		clients:    make(map[int64]map[*Client]bool),
+		register:   make(chan *Client),
+		unregister: make(chan *Client),
+		broadcast:  make(chan *UserMessage, 256),
+		db:         db,
+	}
+}
+
+// SetDB sets the database connection for call lookups
+func (h *Hub) SetDB(db *sql.DB) {
+	h.db = db
+}
+
+// GetCallInfo retrieves call information for signaling validation
+func (h *Hub) GetCallInfo(callID int64) *CallInfo {
+	if h.db == nil {
+		log.Printf("Hub: database connection not set")
+		return nil
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	var callInfo CallInfo
+	err := h.db.QueryRowContext(ctx,
+		"SELECT id, caller_id, callee_id, status FROM calls WHERE id = ?",
+		callID,
+	).Scan(&callInfo.ID, &callInfo.CallerID, &callInfo.CalleeID, &callInfo.State)
+
+	if err != nil {
+		if err != sql.ErrNoRows {
+			log.Printf("Hub: failed to get call info: %v", err)
+		}
+		return nil
+	}
+
+	return &callInfo
 }
 
 // Run starts the hub

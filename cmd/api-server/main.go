@@ -82,10 +82,10 @@ func main() {
 	secretChatsService := secretchats.NewService(secretChatsRepo)
 	broadcastsService := broadcasts.NewService(broadcastsRepo)
 
-	// Initialize WebSocket hub
-	hub := ws.NewHub()
+	// Initialize WebSocket hub with database connection for signaling
+	hub := ws.NewHubWithDB(mysqlStore.DB())
 	go hub.Run()
-	log.Println("WebSocket hub started")
+	log.Println("WebSocket hub started with signaling support")
 
 	// Initialize handlers
 	handlers := &api.Handlers{
